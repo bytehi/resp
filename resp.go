@@ -1,100 +1,62 @@
 package resp
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
-	"strconv"
 )
 
-type RESP_TYPE byte
+type RespType byte
 
-func (r RESP_TYPE) String() string {
+func (r RespType) String() string {
 	return fmt.Sprintf("\"%c\"", r)
 }
 
-func (r RESP_TYPE) MarshalJSON() ([]byte, error) {
+func (r RespType) MarshalJSON() ([]byte, error) {
 	return []byte(r.String()), nil
 }
 
 const (
-	SimpleString RESP_TYPE = '+' //Value is string
-	Error        RESP_TYPE = '-' //Value is string
-	Integer      RESP_TYPE = ':' //value is int64
-	BulkString   RESP_TYPE = '$' //value is string
-	Array        RESP_TYPE = '*' //value is []*RESP
+	SimpleString RespType = '+' // Simple string response, value is string
+	Error        RespType = '-' // Error response, value is string
+	Integer      RespType = ':' // Integer response, value is int64
+	BulkString   RespType = '$' // Bulk string response, value is string
+	Array        RespType = '*' // Array response, value is []*RESP
 )
 
 type RESP struct {
-	Type  RESP_TYPE
-	Value interface{}
+	Type  RespType    `json:"type"`
+	Value interface{} `json:"value"`
 }
 
 func (r *RESP) String() string {
-	datas, _ := json.Marshal(r)
+	datas, err := json.Marshal(r)
+	if err != nil {
+		return fmt.Sprintf("error marshaling response: %v", err)
+	}
 	return string(datas)
 }
 
-func Parse(reader *bufio.Reader) (*RESP, error) {
-	readline := func() ([]byte, error) {
-		line, isPrefix, err := reader.ReadLine()
-		for isPrefix && err == nil {
-			var line2 []byte
-			line2, isPrefix, err = reader.ReadLine()
-			if err == nil {
-				line = append(line, line2...)
-			}
-		}
-		if err != nil {
-			return nil, err
-		}
-		return line, nil
-	}
+// create a simple string response
+func NewSimpleString(value string) *RESP {
+	return &RESP{Type: SimpleString, Value: value}
+}
 
-	firstLine, err := readline()
-	if err != nil {
-		return nil, err
-	}
-	typ := RESP_TYPE(firstLine[0])
-	switch typ {
-	case SimpleString, Error:
-		return &RESP{Type: typ, Value: string(firstLine[1:])}, nil
-	case Integer:
-		val, err := strconv.ParseInt(string(firstLine[1:]), 10, 64)
-		if err != nil {
-			return nil, err
-		}
-		return &RESP{Type: typ, Value: val}, nil
-	case BulkString:
-		strLen, err := strconv.Atoi(string(firstLine[1:]))
-		if err != nil {
-			return nil, err
-		}
-		buf := make([]byte, strLen+2)
-		_, err = io.ReadFull(reader, buf)
-		if err != nil {
-			return nil, err
-		}
-		return &RESP{Type: typ, Value: string(buf[:strLen])}, nil
-	case Array:
-		num, err := strconv.Atoi(string(firstLine[1:]))
-		if err != nil {
-			return nil, err
-		}
-		members := make([]*RESP, num)
-		for i := 0; i < num; i++ {
-			resp2, err := Parse(reader)
-			if err != nil {
-				return nil, err
-			}
-			members[i] = resp2
-		}
-		return &RESP{
-			Type:  Array,
-			Value: members,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unknown type:%s", typ)
-	}
+// create a error response
+func NewError(value string) *RESP {
+	return &RESP{Type: Error, Value: value}
+}
+
+// create a integer response
+func NewInteger(value int64) *RESP {
+	return &RESP{Type: Integer, Value: value}
+}
+
+// create a bulk string response
+func NewBulkString(value string) *RESP {
+	return &RESP{Type: BulkString, Value: value}
+}
+
+// create a array response
+func NewArray(value []*RESP) *RESP {
+	return &RESP{Type: Array, Value: value}
 }

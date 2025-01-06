@@ -10,7 +10,7 @@ import (
 )
 
 func TestResp(t *testing.T) {
-	input := "+OK\r\n-Erradd\r\n*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n:99\r\n$3\r\nabc\r\n:-10\r\n"
+	input := "+OK\r\n-Erradd\r\n*3\r\n$3\r\nfoo\r\n$3\r\nbar\r\n*2\r\n:55\r\n$5\r\nhello\r\n:99\r\n$3\r\nabc\r\n:-10\r\n"
 	pr, pw := io.Pipe()
 	go func() {
 		for {
@@ -34,7 +34,7 @@ func TestResp(t *testing.T) {
 		marshalBytes = append(marshalBytes, bs...)
 		fmt.Println("Parse RESP:", resp)
 	}
-	if bytes.Compare([]byte(input), marshalBytes) != 0 {
+	if !bytes.Equal([]byte(input), marshalBytes) {
 		panic("marshal err")
 	}
 }
